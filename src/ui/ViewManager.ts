@@ -52,18 +52,20 @@ export class ViewManager {
   }
 
   async activateView(): Promise<void> {
-    const existingLeaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
-
     // Create new leaf based on defaultViewLocation setting
     let leaf: WorkspaceLeaf | null = null;
-    const useSidebar =
-      this.settings.defaultViewLocation === "sidebar" &&
-      existingLeaves.length === 0;
+    const useSidebar = this.settings.defaultViewLocation === "sidebar";
 
-    if (!useSidebar) {
-      leaf = this.app.workspace.getLeaf("tab");
+    if (useSidebar) {
+      // Create a dedicated session leaf in the right sidebar for each new session.
+      // Tabs in the OpenCode header are used to jump between these leaves.
+      const rightSplit = this.app.workspace.rightSplit as { collapsed?: boolean; toggle?: () => void } | null;
+      if (rightSplit && rightSplit.collapsed && typeof rightSplit.toggle === "function") {
+        rightSplit.toggle();
+      }
+      leaf = this.app.workspace.getRightLeaf(true);
     } else {
-      leaf = this.app.workspace.getRightLeaf(false);
+      leaf = this.app.workspace.getLeaf("tab");
     }
 
     if (leaf) {
