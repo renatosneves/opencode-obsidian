@@ -5,12 +5,9 @@ import type OpenCodePlugin from "../main";
 import type { ServerState } from "../server/types";
 
 export class OpenCodeView extends ItemView {
-  private static nextViewId = 1;
-
   plugin: OpenCodePlugin;
   private iframeEl: HTMLIFrameElement | null = null;
   private sessionUrl: string | null = null;
-  private readonly viewId: string;
   private sessionTabsEl: HTMLElement | null = null;
   private currentState: ServerState = "stopped";
   private unsubscribeStateChange: (() => void) | null = null;
@@ -19,7 +16,6 @@ export class OpenCodeView extends ItemView {
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodePlugin) {
     super(leaf);
     this.plugin = plugin;
-    this.viewId = `view-${OpenCodeView.nextViewId++}`;
   }
 
   getViewType(): string {
@@ -68,7 +64,7 @@ export class OpenCodeView extends ItemView {
       this.unsubscribeSessionTabsChange = null;
     }
 
-    this.plugin.unregisterViewSession(this.viewId);
+    this.plugin.unregisterLeafSessions(this.leaf);
     
     // Clean up iframe
     if (this.iframeEl) {
@@ -219,10 +215,6 @@ export class OpenCodeView extends ItemView {
 
   getTrackedSessionUrl(): string | null {
     return this.getCurrentSessionUrl();
-  }
-
-  getViewId(): string {
-    return this.viewId;
   }
 
   getSessionId(): string | null {

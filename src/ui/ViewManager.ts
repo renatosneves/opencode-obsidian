@@ -11,11 +11,7 @@ type ViewManagerDeps = {
   client: OpenCodeClient;
   contextManager: ContextManager;
   getServerState: () => ServerState;
-  registerSessionForView: (
-    viewId: string,
-    leaf: WorkspaceLeaf,
-    sessionId: string
-  ) => void;
+  registerSession: (sessionId: string, leaf: WorkspaceLeaf) => void;
 };
 
 export class ViewManager {
@@ -24,11 +20,7 @@ export class ViewManager {
   private client: OpenCodeClient;
   private contextManager: ContextManager;
   private getServerState: () => ServerState;
-  private registerSessionForView: (
-    viewId: string,
-    leaf: WorkspaceLeaf,
-    sessionId: string
-  ) => void;
+  private registerSession: (sessionId: string, leaf: WorkspaceLeaf) => void;
 
   constructor(deps: ViewManagerDeps) {
     this.app = deps.app;
@@ -36,7 +28,7 @@ export class ViewManager {
     this.client = deps.client;
     this.contextManager = deps.contextManager;
     this.getServerState = deps.getServerState;
-    this.registerSessionForView = deps.registerSessionForView;
+    this.registerSession = deps.registerSession;
   }
 
   updateSettings(settings: OpenCodeSettings): void {
@@ -51,19 +43,32 @@ export class ViewManager {
     return null;
   }
 
+  private getExistingSidebarLeaf(): WorkspaceLeaf | null {
+    const rightSplit = this.app.workspace.rightSplit;
+    if (!rightSplit) {
+      return null;
+    }
+
+    const leaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
+    return leaves.find((leaf) => leaf.getRoot() === rightSplit) ?? null;
+  }
+
   async activateView(): Promise<void> {
     // Create new leaf based on defaultViewLocation setting
     let leaf: WorkspaceLeaf | null = null;
     const useSidebar = this.settings.defaultViewLocation === "sidebar";
 
     if (useSidebar) {
-      // Create a dedicated session leaf in the right sidebar for each new session.
-      // Tabs in the OpenCode header are used to jump between these leaves.
+      leaf = this.getExistingSidebarLeaf();
+
       const rightSplit = this.app.workspace.rightSplit as { collapsed?: boolean; toggle?: () => void } | null;
       if (rightSplit && rightSplit.collapsed && typeof rightSplit.toggle === "function") {
         rightSplit.toggle();
       }
-      leaf = this.app.workspace.getRightLeaf(true);
+
+      if (!leaf) {
+        leaf = this.app.workspace.getRightLeaf(true);
+      }
     } else {
       leaf = this.app.workspace.getLeaf("tab");
     }
@@ -75,6 +80,22 @@ export class ViewManager {
       });
       this.app.workspace.revealLeaf(leaf);
     }
+  }
+
+  async openNewSession(): Promise<void> {
+    if (this.settings.defaultViewLocation !== "sidebar") {
+      await this.activateView();
+      return;
+    }
+
+    await this.activateView();
+    const leaf = this.getExistingSidebarLeaf();
+    const view = leaf?.view instanceof OpenCodeView ? leaf.view : null;
+    if (!view || this.getServerState() !== "running") {
+      return;
+    }
+
+    await this.createAndActivateSession(view);
   }
 
   async toggleView(): Promise<void> {
@@ -99,10 +120,14 @@ export class ViewManager {
       : null;
     if (trackedUrl && trackedSessionId) {
       view.setIframeUrl(trackedUrl);
-      this.registerSessionForView(view.getViewId(), view.getLeaf(), trackedSessionId);
+      this.registerSession(trackedSessionId, view.getLeaf());
       return;
     }
 
+    await this.createAndActivateSession(view);
+  }
+
+  private async createAndActivateSession(view: OpenCodeView): Promise<void> {
     const sessionId = await this.client.createSession();
     if (!sessionId) {
       return;
@@ -110,10 +135,7 @@ export class ViewManager {
 
     const sessionUrl = this.client.getSessionUrl(sessionId);
     view.setIframeUrl(sessionUrl);
-    this.registerSessionForView(view.getViewId(), view.getLeaf(), sessionId);
-
-    if (this.app.workspace.activeLeaf === view.getLeaf()) {
-      await this.contextManager.refreshContextForView(view);
-    }
+    this.registerSession(sessionId, view.getLeaf());
+    await this.contextManager.refreshContextForView(view);
   }
 }

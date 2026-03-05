@@ -1,33 +1,19 @@
 import { OpenCodeSessionTab } from "../types";
 
 type SessionBinding<TLeaf> = {
-  viewId: string;
   sessionId: string;
   leaf: TLeaf;
 };
 
 export class SessionRegistry<TLeaf> {
-  private viewBindings = new Map<string, SessionBinding<TLeaf>>();
-  private sessionToView = new Map<string, string>();
+  private sessionBindings = new Map<string, SessionBinding<TLeaf>>();
   private sessionOrder: string[] = [];
 
-  register(viewId: string, leaf: TLeaf, sessionId: string): boolean {
+  register(sessionId: string, leaf: TLeaf): boolean {
     let changed = false;
 
-    const existingBindingForView = this.viewBindings.get(viewId);
-    if (
-      existingBindingForView &&
-      existingBindingForView.sessionId !== sessionId &&
-      this.sessionToView.get(existingBindingForView.sessionId) === viewId
-    ) {
-      this.sessionToView.delete(existingBindingForView.sessionId);
-      this.removeSessionFromOrder(existingBindingForView.sessionId);
-      changed = true;
-    }
-
-    const existingViewForSession = this.sessionToView.get(sessionId);
-    if (existingViewForSession && existingViewForSession !== viewId) {
-      this.viewBindings.delete(existingViewForSession);
+    const existing = this.sessionBindings.get(sessionId);
+    if (!existing || existing.leaf !== leaf) {
       changed = true;
     }
 
@@ -37,65 +23,58 @@ export class SessionRegistry<TLeaf> {
     }
 
     const nextBinding: SessionBinding<TLeaf> = {
-      viewId,
       sessionId,
       leaf,
     };
 
-    if (
-      !existingBindingForView ||
-      existingBindingForView.sessionId !== sessionId ||
-      existingBindingForView.leaf !== leaf
-    ) {
-      changed = true;
-    }
-
-    this.viewBindings.set(viewId, nextBinding);
-    this.sessionToView.set(sessionId, viewId);
+    this.sessionBindings.set(sessionId, nextBinding);
 
     return changed;
   }
 
-  unregisterView(viewId: string): boolean {
-    const binding = this.viewBindings.get(viewId);
-    if (!binding) {
+  unregisterSessionsForLeaf(leaf: TLeaf): boolean {
+    const sessionsToRemove: string[] = [];
+    for (const [sessionId, binding] of this.sessionBindings.entries()) {
+      if (binding.leaf === leaf) {
+        sessionsToRemove.push(sessionId);
+      }
+    }
+
+    if (sessionsToRemove.length === 0) {
       return false;
     }
 
-    this.viewBindings.delete(viewId);
-    if (this.sessionToView.get(binding.sessionId) === viewId) {
-      this.sessionToView.delete(binding.sessionId);
+    for (const sessionId of sessionsToRemove) {
+      this.sessionBindings.delete(sessionId);
+      this.removeSessionFromOrder(sessionId);
     }
-    this.removeSessionFromOrder(binding.sessionId);
+
     return true;
   }
 
   prune(isLeafValid: (leaf: TLeaf) => boolean): boolean {
-    const removedViewIds: string[] = [];
+    const removedSessionIds: string[] = [];
 
-    for (const [viewId, binding] of this.viewBindings.entries()) {
+    for (const [sessionId, binding] of this.sessionBindings.entries()) {
       if (!isLeafValid(binding.leaf)) {
-        removedViewIds.push(viewId);
+        removedSessionIds.push(sessionId);
       }
     }
 
-    if (removedViewIds.length === 0) {
+    if (removedSessionIds.length === 0) {
       return false;
     }
 
-    for (const viewId of removedViewIds) {
-      this.unregisterView(viewId);
+    for (const sessionId of removedSessionIds) {
+      this.sessionBindings.delete(sessionId);
+      this.removeSessionFromOrder(sessionId);
     }
 
     return true;
   }
 
   resolveLeaf(sessionId: string): TLeaf | null {
-    const viewId = this.sessionToView.get(sessionId);
-    if (!viewId) {
-      return null;
-    }
-    return this.viewBindings.get(viewId)?.leaf ?? null;
+    return this.sessionBindings.get(sessionId)?.leaf ?? null;
   }
 
   getTabs(activeSessionId?: string): OpenCodeSessionTab[] {
@@ -130,12 +109,8 @@ export class SessionRegistry<TLeaf> {
       if (seen.has(sessionId)) {
         continue;
       }
-      const mappedViewId = this.sessionToView.get(sessionId);
-      if (!mappedViewId) {
-        continue;
-      }
-      const binding = this.viewBindings.get(mappedViewId);
-      if (!binding || binding.sessionId !== sessionId) {
+      const binding = this.sessionBindings.get(sessionId);
+      if (!binding) {
         continue;
       }
 

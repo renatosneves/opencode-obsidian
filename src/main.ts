@@ -76,8 +76,8 @@ export default class OpenCodePlugin extends Plugin {
       client: this.openCodeClient,
       contextManager: this.contextManager,
       getServerState: () => this.getServerState(),
-      registerSessionForView: (viewId, leaf, sessionId) => {
-        this.registerSessionForView(viewId, leaf, sessionId);
+      registerSession: (sessionId, leaf) => {
+        this.registerSession(sessionId, leaf);
       },
     });
 
@@ -362,19 +362,15 @@ export default class OpenCodePlugin extends Plugin {
     await this.viewManager.ensureSessionUrl(view);
   }
 
-  registerSessionForView(
-    viewId: string,
-    leaf: WorkspaceLeaf,
-    sessionId: string
-  ): void {
-    const changed = this.sessionRegistry.register(viewId, leaf, sessionId);
+  registerSession(sessionId: string, leaf: WorkspaceLeaf): void {
+    const changed = this.sessionRegistry.register(sessionId, leaf);
     if (changed) {
       this.notifySessionTabsChange();
     }
   }
 
-  unregisterViewSession(viewId: string): void {
-    const changed = this.sessionRegistry.unregisterView(viewId);
+  unregisterLeafSessions(leaf: WorkspaceLeaf): void {
+    const changed = this.sessionRegistry.unregisterSessionsForLeaf(leaf);
     if (changed) {
       this.notifySessionTabsChange();
     }
@@ -391,11 +387,21 @@ export default class OpenCodePlugin extends Plugin {
     if (!leaf) {
       return;
     }
+
+    const sessionUrl = this.openCodeClient.getSessionUrl(sessionId);
+    const view = leaf.view instanceof OpenCodeView ? leaf.view : null;
+    if (view) {
+      view.setIframeUrl(sessionUrl);
+    }
+
     this.app.workspace.revealLeaf(leaf);
+    if (view) {
+      await this.contextManager.refreshContextForView(view);
+    }
   }
 
   async openNewSessionView(): Promise<void> {
-    await this.viewManager.activateView();
+    await this.viewManager.openNewSession();
   }
 
   onSessionTabsChange(callback: () => void): () => void {

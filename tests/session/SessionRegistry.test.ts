@@ -7,8 +7,8 @@ describe("SessionRegistry", () => {
   test("registers first and second sessions with sequential labels", () => {
     const registry = new SessionRegistry<FakeLeaf>();
 
-    registry.register("view-1", { id: "leaf-1" }, "session-1");
-    registry.register("view-2", { id: "leaf-2" }, "session-2");
+    registry.register("session-1", { id: "leaf-1" });
+    registry.register("session-2", { id: "leaf-2" });
 
     const tabs = registry.getTabs();
     expect(tabs).toHaveLength(2);
@@ -26,11 +26,13 @@ describe("SessionRegistry", () => {
 
   test("unregistering a view removes its session tab", () => {
     const registry = new SessionRegistry<FakeLeaf>();
+    const leaf1 = { id: "leaf-1" };
+    const leaf2 = { id: "leaf-2" };
 
-    registry.register("view-1", { id: "leaf-1" }, "session-1");
-    registry.register("view-2", { id: "leaf-2" }, "session-2");
+    registry.register("session-1", leaf1);
+    registry.register("session-2", leaf2);
 
-    expect(registry.unregisterView("view-1")).toBe(true);
+    expect(registry.unregisterSessionsForLeaf(leaf1)).toBe(true);
     expect(registry.getTabs()).toEqual([
       {
         sessionId: "session-2",
@@ -42,12 +44,15 @@ describe("SessionRegistry", () => {
 
   test("labels are compacted after closing a session", () => {
     const registry = new SessionRegistry<FakeLeaf>();
+    const leaf1 = { id: "leaf-1" };
+    const leaf2 = { id: "leaf-2" };
+    const leaf3 = { id: "leaf-3" };
 
-    registry.register("view-1", { id: "leaf-1" }, "session-1");
-    registry.register("view-2", { id: "leaf-2" }, "session-2");
+    registry.register("session-1", leaf1);
+    registry.register("session-2", leaf2);
 
-    registry.unregisterView("view-1");
-    registry.register("view-3", { id: "leaf-3" }, "session-3");
+    registry.unregisterSessionsForLeaf(leaf1);
+    registry.register("session-3", leaf3);
 
     expect(registry.getTabs()).toEqual([
       {
@@ -63,11 +68,11 @@ describe("SessionRegistry", () => {
     ]);
   });
 
-  test("re-registering same view and session does not duplicate tabs", () => {
+  test("re-registering same session on a leaf does not duplicate tabs", () => {
     const registry = new SessionRegistry<FakeLeaf>();
 
-    registry.register("view-1", { id: "leaf-1" }, "session-1");
-    registry.register("view-1", { id: "leaf-1b" }, "session-1");
+    registry.register("session-1", { id: "leaf-1" });
+    registry.register("session-1", { id: "leaf-1b" });
 
     const tabs = registry.getTabs();
     expect(tabs).toHaveLength(1);
@@ -77,7 +82,7 @@ describe("SessionRegistry", () => {
   test("resolving unknown session returns null and keeps state unchanged", () => {
     const registry = new SessionRegistry<FakeLeaf>();
 
-    registry.register("view-1", { id: "leaf-1" }, "session-1");
+    registry.register("session-1", { id: "leaf-1" });
     const before = registry.getTabs();
 
     expect(registry.resolveLeaf("missing-session")).toBeNull();
