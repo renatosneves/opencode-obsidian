@@ -68,6 +68,23 @@ describe("SessionRegistry", () => {
     ]);
   });
 
+  test("unregistering a single session removes only that session", () => {
+    const registry = new SessionRegistry<FakeLeaf>();
+    const leaf = { id: "leaf-1" };
+
+    registry.register("session-1", leaf);
+    registry.register("session-2", leaf);
+
+    expect(registry.unregisterSession("session-1")).toBe(true);
+    expect(registry.getTabs()).toEqual([
+      {
+        sessionId: "session-2",
+        label: "Session 1",
+        isActive: false,
+      },
+    ]);
+  });
+
   test("re-registering same session on a leaf does not duplicate tabs", () => {
     const registry = new SessionRegistry<FakeLeaf>();
 

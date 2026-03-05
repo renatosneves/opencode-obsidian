@@ -1,6 +1,6 @@
 {
   "name": "opencode-obsidian-neves",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "Embed OpenCode AI assistant in Obsidian",
   "main": "main.js",
   "scripts": {

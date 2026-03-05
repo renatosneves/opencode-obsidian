@@ -71,6 +71,9 @@
 }
 
 .opencode-session-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: var(--background-primary-alt);
   color: var(--text-muted);
   border: 1px solid var(--background-modifier-border);
@@ -88,10 +91,36 @@
   background: var(--background-modifier-hover);
 }
 
+.opencode-session-tab-label {
+  pointer-events: none;
+}
+
+.opencode-session-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.opencode-session-tab:hover .opencode-session-tab-close {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+}
+
 .opencode-session-tab.is-active {
   color: var(--text-on-accent);
   background: var(--interactive-accent);
   border-color: var(--interactive-accent);
+}
+
+.opencode-session-tab.is-active .opencode-session-tab-close {
+  color: var(--text-on-accent);
 }
 
 .opencode-session-tab-add {

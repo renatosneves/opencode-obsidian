@@ -32,6 +32,16 @@ export class SessionRegistry<TLeaf> {
     return changed;
   }
 
+  unregisterSession(sessionId: string): boolean {
+    const hadSession = this.sessionBindings.delete(sessionId);
+    if (!hadSession) {
+      return false;
+    }
+
+    this.removeSessionFromOrder(sessionId);
+    return true;
+  }
+
   unregisterSessionsForLeaf(leaf: TLeaf): boolean {
     const sessionsToRemove: string[] = [];
     for (const [sessionId, binding] of this.sessionBindings.entries()) {

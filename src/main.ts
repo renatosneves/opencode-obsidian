@@ -405,6 +405,46 @@ export default class OpenCodePlugin extends Plugin {
     await this.viewManager.openNewSession();
   }
 
+  async closeSession(sessionId: string, currentSessionId?: string): Promise<void> {
+    this.pruneStaleSessionLeaves();
+
+    const tabsBefore = this.sessionRegistry.getTabs(currentSessionId);
+    const closedIndex = tabsBefore.findIndex((tab) => tab.sessionId === sessionId);
+    if (closedIndex < 0) {
+      return;
+    }
+
+    const wasCurrentSession = currentSessionId === sessionId;
+    const changed = this.sessionRegistry.unregisterSession(sessionId);
+    if (!changed) {
+      return;
+    }
+
+    const tabsAfter = this.sessionRegistry.getTabs(
+      wasCurrentSession ? undefined : currentSessionId
+    );
+
+    if (tabsAfter.length === 0) {
+      this.notifySessionTabsChange();
+      await this.openNewSessionView();
+      return;
+    }
+
+    if (!wasCurrentSession) {
+      this.notifySessionTabsChange();
+      return;
+    }
+
+    const nextIndex = Math.min(closedIndex, tabsAfter.length - 1);
+    const fallbackSession = tabsAfter[nextIndex];
+    if (!fallbackSession) {
+      this.notifySessionTabsChange();
+      return;
+    }
+
+    await this.activateSession(fallbackSession.sessionId);
+  }
+
   onSessionTabsChange(callback: () => void): () => void {
     this.sessionTabsCallbacks.push(callback);
     return () => {

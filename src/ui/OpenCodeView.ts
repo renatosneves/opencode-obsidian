@@ -272,14 +272,28 @@ export class OpenCodeView extends ItemView {
     const tabs = this.plugin.getSessionTabs(this.getSessionId() ?? undefined);
     for (const tab of tabs) {
       const tabEl = this.sessionTabsEl.createEl("button", {
-        text: tab.label,
         cls: "opencode-session-tab",
+        attr: { "aria-label": `Switch to ${tab.label}` },
+      });
+      tabEl.createSpan({
+        text: tab.label,
+        cls: "opencode-session-tab-label",
       });
       if (tab.isActive) {
         tabEl.addClass("is-active");
       }
       tabEl.addEventListener("click", () => {
         void this.plugin.activateSession(tab.sessionId);
+      });
+
+      const closeEl = tabEl.createSpan({
+        text: "\u00d7",
+        cls: "opencode-session-tab-close",
+      });
+      closeEl.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.plugin.closeSession(tab.sessionId, this.getSessionId() ?? undefined);
       });
     }
 
