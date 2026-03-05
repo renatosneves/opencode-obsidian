@@ -4,14 +4,12 @@ type SessionBinding<TLeaf> = {
   viewId: string;
   sessionId: string;
   leaf: TLeaf;
-  labelNumber: number;
 };
 
 export class SessionRegistry<TLeaf> {
   private viewBindings = new Map<string, SessionBinding<TLeaf>>();
   private sessionToView = new Map<string, string>();
-  private sessionLabelNumbers = new Map<string, number>();
-  private nextLabelNumber = 1;
+  private sessionOrder: string[] = [];
 
   register(viewId: string, leaf: TLeaf, sessionId: string): boolean {
     let changed = false;
@@ -23,6 +21,7 @@ export class SessionRegistry<TLeaf> {
       this.sessionToView.get(existingBindingForView.sessionId) === viewId
     ) {
       this.sessionToView.delete(existingBindingForView.sessionId);
+      this.removeSessionFromOrder(existingBindingForView.sessionId);
       changed = true;
     }
 
@@ -32,17 +31,15 @@ export class SessionRegistry<TLeaf> {
       changed = true;
     }
 
-    if (!this.sessionLabelNumbers.has(sessionId)) {
-      this.sessionLabelNumbers.set(sessionId, this.nextLabelNumber++);
+    if (!this.sessionOrder.includes(sessionId)) {
+      this.sessionOrder.push(sessionId);
       changed = true;
     }
 
-    const labelNumber = this.sessionLabelNumbers.get(sessionId) ?? 0;
     const nextBinding: SessionBinding<TLeaf> = {
       viewId,
       sessionId,
       leaf,
-      labelNumber,
     };
 
     if (
@@ -69,6 +66,7 @@ export class SessionRegistry<TLeaf> {
     if (this.sessionToView.get(binding.sessionId) === viewId) {
       this.sessionToView.delete(binding.sessionId);
     }
+    this.removeSessionFromOrder(binding.sessionId);
     return true;
   }
 
@@ -101,12 +99,50 @@ export class SessionRegistry<TLeaf> {
   }
 
   getTabs(activeSessionId?: string): OpenCodeSessionTab[] {
-    return Array.from(this.viewBindings.values())
-      .sort((a, b) => a.labelNumber - b.labelNumber)
-      .map((binding) => ({
-        sessionId: binding.sessionId,
-        label: `Session ${binding.labelNumber}`,
-        isActive: binding.sessionId === activeSessionId,
-      }));
+    this.normalizeSessionOrder();
+
+    let labelNumber = 1;
+    const tabs: OpenCodeSessionTab[] = [];
+
+    for (const sessionId of this.sessionOrder) {
+      tabs.push({
+        sessionId,
+        label: `Session ${labelNumber++}`,
+        isActive: sessionId === activeSessionId,
+      });
+    }
+
+    return tabs;
+  }
+
+  private removeSessionFromOrder(sessionId: string): void {
+    const index = this.sessionOrder.indexOf(sessionId);
+    if (index > -1) {
+      this.sessionOrder.splice(index, 1);
+    }
+  }
+
+  private normalizeSessionOrder(): void {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+
+    for (const sessionId of this.sessionOrder) {
+      if (seen.has(sessionId)) {
+        continue;
+      }
+      const mappedViewId = this.sessionToView.get(sessionId);
+      if (!mappedViewId) {
+        continue;
+      }
+      const binding = this.viewBindings.get(mappedViewId);
+      if (!binding || binding.sessionId !== sessionId) {
+        continue;
+      }
+
+      seen.add(sessionId);
+      deduped.push(sessionId);
+    }
+
+    this.sessionOrder = deduped;
   }
 }

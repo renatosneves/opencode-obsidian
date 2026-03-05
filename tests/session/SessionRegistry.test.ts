@@ -34,6 +34,29 @@ describe("SessionRegistry", () => {
     expect(registry.getTabs()).toEqual([
       {
         sessionId: "session-2",
+        label: "Session 1",
+        isActive: false,
+      },
+    ]);
+  });
+
+  test("labels are compacted after closing a session", () => {
+    const registry = new SessionRegistry<FakeLeaf>();
+
+    registry.register("view-1", { id: "leaf-1" }, "session-1");
+    registry.register("view-2", { id: "leaf-2" }, "session-2");
+
+    registry.unregisterView("view-1");
+    registry.register("view-3", { id: "leaf-3" }, "session-3");
+
+    expect(registry.getTabs()).toEqual([
+      {
+        sessionId: "session-2",
+        label: "Session 1",
+        isActive: false,
+      },
+      {
+        sessionId: "session-3",
         label: "Session 2",
         isActive: false,
       },
