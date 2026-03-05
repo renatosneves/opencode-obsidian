@@ -398,6 +398,7 @@ export default class OpenCodePlugin extends Plugin {
     if (view) {
       await this.contextManager.refreshContextForView(view);
     }
+    this.notifySessionTabsChange();
   }
 
   async openNewSessionView(): Promise<void> {

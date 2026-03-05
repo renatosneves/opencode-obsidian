@@ -53,21 +53,39 @@ export class ViewManager {
     return leaves.find((leaf) => leaf.getRoot() === rightSplit) ?? null;
   }
 
+  private getSidebarOpenCodeLeaves(): WorkspaceLeaf[] {
+    const rightSplit = this.app.workspace.rightSplit;
+    if (!rightSplit) {
+      return [];
+    }
+
+    return this.app.workspace
+      .getLeavesOfType(OPENCODE_VIEW_TYPE)
+      .filter((leaf) => leaf.getRoot() === rightSplit);
+  }
+
   async activateView(): Promise<void> {
     // Create new leaf based on defaultViewLocation setting
     let leaf: WorkspaceLeaf | null = null;
     const useSidebar = this.settings.defaultViewLocation === "sidebar";
 
     if (useSidebar) {
-      leaf = this.getExistingSidebarLeaf();
-
       const rightSplit = this.app.workspace.rightSplit as { collapsed?: boolean; toggle?: () => void } | null;
       if (rightSplit && rightSplit.collapsed && typeof rightSplit.toggle === "function") {
         rightSplit.toggle();
       }
 
+      const sidebarOpenCodeLeaves = this.getSidebarOpenCodeLeaves();
+      if (sidebarOpenCodeLeaves.length > 1) {
+        for (const duplicateLeaf of sidebarOpenCodeLeaves.slice(1)) {
+          duplicateLeaf.detach();
+        }
+      }
+
+      leaf = sidebarOpenCodeLeaves[0] ?? this.getExistingSidebarLeaf();
       if (!leaf) {
-        leaf = this.app.workspace.getRightLeaf(true);
+        // false = reuse right sidebar container instead of creating vertical splits
+        leaf = this.app.workspace.getRightLeaf(false);
       }
     } else {
       leaf = this.app.workspace.getLeaf("tab");
