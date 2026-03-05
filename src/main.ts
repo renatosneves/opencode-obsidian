@@ -1,8 +1,13 @@
-import { Plugin, Notice } from "obsidian";
+import { Plugin, Notice, WorkspaceLeaf } from "obsidian";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
-import { OpenCodeSettings, DEFAULT_SETTINGS, OPENCODE_VIEW_TYPE } from "./types";
+import {
+  OpenCodeSettings,
+  DEFAULT_SETTINGS,
+  OPENCODE_VIEW_TYPE,
+  OpenCodeSessionTab,
+} from "./types";
 import { OpenCodeView } from "./ui/OpenCodeView";
 import { ViewManager } from "./ui/ViewManager";
 import { OpenCodeSettingTab } from "./settings/SettingsTab";
@@ -11,6 +16,7 @@ import { registerOpenCodeIcons, OPENCODE_ICON_NAME } from "./icons";
 import { OpenCodeClient } from "./client/OpenCodeClient";
 import { ContextManager } from "./context/ContextManager";
 import { ExecutableResolver } from "./server/ExecutableResolver";
+import { SessionRegistry } from "./session/SessionRegistry";
 
 export default class OpenCodePlugin extends Plugin {
   settings: OpenCodeSettings = DEFAULT_SETTINGS;
@@ -19,6 +25,8 @@ export default class OpenCodePlugin extends Plugin {
   private openCodeClient: OpenCodeClient;
   private contextManager: ContextManager;
   private viewManager: ViewManager;
+  private sessionRegistry = new SessionRegistry<WorkspaceLeaf>();
+  private sessionTabsCallbacks: Array<() => void> = [];
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
@@ -68,6 +76,9 @@ export default class OpenCodePlugin extends Plugin {
       client: this.openCodeClient,
       contextManager: this.contextManager,
       getServerState: () => this.getServerState(),
+      registerSessionForView: (viewId, leaf, sessionId) => {
+        this.registerSessionForView(viewId, leaf, sessionId);
+      },
     });
 
     console.log(
@@ -88,7 +99,7 @@ export default class OpenCodePlugin extends Plugin {
     ));
 
     this.addRibbonIcon(OPENCODE_ICON_NAME, "OpenCode", () => {
-      void this.viewManager.activateView();
+      void this.openNewSessionView();
     });
     this.addRightRibbonIcon();
 
@@ -104,6 +115,14 @@ export default class OpenCodePlugin extends Plugin {
           key: "o",
         },
       ],
+    });
+
+    this.addCommand({
+      id: "open-new-opencode-session",
+      name: "Open new OpenCode session",
+      callback: () => {
+        void this.openNewSessionView();
+      },
     });
 
     this.addCommand({
@@ -160,6 +179,7 @@ export default class OpenCodePlugin extends Plugin {
     this.contextManager.destroy();
     await this.stopServer();
     this.app.workspace.detachLeavesOfType(OPENCODE_VIEW_TYPE);
+    this.sessionTabsCallbacks = [];
   }
 
   async loadSettings(): Promise<void> {
@@ -342,6 +362,52 @@ export default class OpenCodePlugin extends Plugin {
     await this.viewManager.ensureSessionUrl(view);
   }
 
+  registerSessionForView(
+    viewId: string,
+    leaf: WorkspaceLeaf,
+    sessionId: string
+  ): void {
+    const changed = this.sessionRegistry.register(viewId, leaf, sessionId);
+    if (changed) {
+      this.notifySessionTabsChange();
+    }
+  }
+
+  unregisterViewSession(viewId: string): void {
+    const changed = this.sessionRegistry.unregisterView(viewId);
+    if (changed) {
+      this.notifySessionTabsChange();
+    }
+  }
+
+  getSessionTabs(activeSessionId?: string): OpenCodeSessionTab[] {
+    this.pruneStaleSessionLeaves();
+    return this.sessionRegistry.getTabs(activeSessionId);
+  }
+
+  async activateSession(sessionId: string): Promise<void> {
+    this.pruneStaleSessionLeaves();
+    const leaf = this.sessionRegistry.resolveLeaf(sessionId);
+    if (!leaf) {
+      return;
+    }
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  async openNewSessionView(): Promise<void> {
+    await this.viewManager.activateView();
+  }
+
+  onSessionTabsChange(callback: () => void): () => void {
+    this.sessionTabsCallbacks.push(callback);
+    return () => {
+      const index = this.sessionTabsCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.sessionTabsCallbacks.splice(index, 1);
+      }
+    };
+  }
+
   getProjectDirectory(): string {
     if (this.settings.projectDirectory) {
       console.log("[OpenCode] Using project directory from settings:", this.settings.projectDirectory);
@@ -365,6 +431,20 @@ export default class OpenCodePlugin extends Plugin {
     );
   }
 
+  private pruneStaleSessionLeaves(): void {
+    const openLeaves = new Set(this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE));
+    const changed = this.sessionRegistry.prune((leaf) => openLeaves.has(leaf));
+    if (changed) {
+      this.notifySessionTabsChange();
+    }
+  }
+
+  private notifySessionTabsChange(): void {
+    for (const callback of this.sessionTabsCallbacks) {
+      callback();
+    }
+  }
+
   private addRightRibbonIcon(): void {
     const rightRibbon = (this.app.workspace as any).rightRibbon;
     const addAction = rightRibbon?.addAction as
@@ -381,7 +461,7 @@ export default class OpenCodePlugin extends Plugin {
       OPENCODE_ICON_NAME,
       "OpenCode",
       () => {
-        void this.viewManager.activateView();
+        void this.openNewSessionView();
       }
     );
 

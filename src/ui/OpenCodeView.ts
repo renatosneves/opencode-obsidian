@@ -5,15 +5,21 @@ import type OpenCodePlugin from "../main";
 import type { ServerState } from "../server/types";
 
 export class OpenCodeView extends ItemView {
+  private static nextViewId = 1;
+
   plugin: OpenCodePlugin;
   private iframeEl: HTMLIFrameElement | null = null;
   private sessionUrl: string | null = null;
+  private readonly viewId: string;
+  private sessionTabsEl: HTMLElement | null = null;
   private currentState: ServerState = "stopped";
   private unsubscribeStateChange: (() => void) | null = null;
+  private unsubscribeSessionTabsChange: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodePlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.viewId = `view-${OpenCodeView.nextViewId++}`;
   }
 
   getViewType(): string {
@@ -37,6 +43,9 @@ export class OpenCodeView extends ItemView {
       this.currentState = state;
       this.updateView();
     });
+    this.unsubscribeSessionTabsChange = this.plugin.onSessionTabsChange(() => {
+      this.renderSessionTabs();
+    });
 
     // Initial render
     this.currentState = this.plugin.getServerState();
@@ -54,6 +63,12 @@ export class OpenCodeView extends ItemView {
       this.unsubscribeStateChange();
       this.unsubscribeStateChange = null;
     }
+    if (this.unsubscribeSessionTabsChange) {
+      this.unsubscribeSessionTabsChange();
+      this.unsubscribeSessionTabsChange = null;
+    }
+
+    this.plugin.unregisterViewSession(this.viewId);
     
     // Clean up iframe
     if (this.iframeEl) {
@@ -84,6 +99,7 @@ export class OpenCodeView extends ItemView {
   }
 
   private renderStoppedState(): void {
+    this.sessionTabsEl = null;
     this.contentEl.empty();
 
     const statusContainer = this.contentEl.createDiv({
@@ -109,6 +125,7 @@ export class OpenCodeView extends ItemView {
   }
 
   private renderStartingState(): void {
+    this.sessionTabsEl = null;
     this.contentEl.empty();
 
     const statusContainer = this.contentEl.createDiv({
@@ -129,13 +146,14 @@ export class OpenCodeView extends ItemView {
     this.contentEl.empty();
 
     const headerEl = this.contentEl.createDiv({ cls: "opencode-header" });
+    const headerTopEl = headerEl.createDiv({ cls: "opencode-header-top" });
 
-    const titleSection = headerEl.createDiv({ cls: "opencode-header-title" });
+    const titleSection = headerTopEl.createDiv({ cls: "opencode-header-title" });
     const iconEl = titleSection.createSpan();
     setIcon(iconEl, OPENCODE_ICON_NAME);
     titleSection.createSpan({ text: "OpenCode" });
 
-    const actionsEl = headerEl.createDiv({ cls: "opencode-header-actions" });
+    const actionsEl = headerTopEl.createDiv({ cls: "opencode-header-actions" });
 
     const reloadButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Reload" },
@@ -160,6 +178,9 @@ export class OpenCodeView extends ItemView {
     stopButton.addEventListener("click", () => {
       this.plugin.stopServer();
     });
+
+    this.sessionTabsEl = headerEl.createDiv({ cls: "opencode-session-tabs" });
+    this.renderSessionTabs();
 
     const iframeContainer = this.contentEl.createDiv({
       cls: "opencode-iframe-container",
@@ -200,6 +221,19 @@ export class OpenCodeView extends ItemView {
     return this.getCurrentSessionUrl();
   }
 
+  getViewId(): string {
+    return this.viewId;
+  }
+
+  getSessionId(): string | null {
+    const trackedUrl = this.getTrackedSessionUrl();
+    if (!trackedUrl) {
+      return null;
+    }
+    const match = trackedUrl.match(/\/session\/([^/?#]+)/);
+    return match?.[1] ?? null;
+  }
+
   getLeaf(): WorkspaceLeaf {
     return this.leaf;
   }
@@ -220,7 +254,39 @@ export class OpenCodeView extends ItemView {
     return this.sessionUrl.startsWith(expectedPrefix) ? this.sessionUrl : null;
   }
 
+  private renderSessionTabs(): void {
+    if (this.currentState !== "running" || !this.sessionTabsEl) {
+      return;
+    }
+
+    this.sessionTabsEl.empty();
+
+    const tabs = this.plugin.getSessionTabs(this.getSessionId() ?? undefined);
+    for (const tab of tabs) {
+      const tabEl = this.sessionTabsEl.createEl("button", {
+        text: tab.label,
+        cls: "opencode-session-tab",
+      });
+      if (tab.isActive) {
+        tabEl.addClass("is-active");
+      }
+      tabEl.addEventListener("click", () => {
+        void this.plugin.activateSession(tab.sessionId);
+      });
+    }
+
+    const addTabButton = this.sessionTabsEl.createEl("button", {
+      text: "+",
+      cls: "opencode-session-tab opencode-session-tab-add",
+      attr: { "aria-label": "Open new OpenCode session" },
+    });
+    addTabButton.addEventListener("click", () => {
+      void this.plugin.openNewSessionView();
+    });
+  }
+
   private renderErrorState(): void {
+    this.sessionTabsEl = null;
     this.contentEl.empty();
 
     const statusContainer = this.contentEl.createDiv({

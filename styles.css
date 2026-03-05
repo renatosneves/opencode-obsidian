@@ -11,12 +11,19 @@
 /* Header */
 .opencode-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--background-modifier-border);
   background-color: var(--background-secondary);
   flex-shrink: 0;
+}
+
+.opencode-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .opencode-header-title {
@@ -53,6 +60,44 @@
 .opencode-header-actions button svg {
   width: 16px;
   height: 16px;
+}
+
+.opencode-session-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.opencode-session-tab {
+  background: var(--background-primary-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.opencode-session-tab:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.opencode-session-tab.is-active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.opencode-session-tab-add {
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
 }
 
 /* iframe container */

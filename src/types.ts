@@ -15,6 +15,12 @@ export interface OpenCodeSettings {
   useCustomCommand: boolean;
 }
 
+export interface OpenCodeSessionTab {
+  sessionId: string;
+  label: string;
+  isActive: boolean;
+}
+
 export const DEFAULT_SETTINGS: OpenCodeSettings = {
   port: 14096,
   hostname: "127.0.0.1",

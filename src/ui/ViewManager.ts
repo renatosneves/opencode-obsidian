@@ -11,6 +11,11 @@ type ViewManagerDeps = {
   client: OpenCodeClient;
   contextManager: ContextManager;
   getServerState: () => ServerState;
+  registerSessionForView: (
+    viewId: string,
+    leaf: WorkspaceLeaf,
+    sessionId: string
+  ) => void;
 };
 
 export class ViewManager {
@@ -19,6 +24,11 @@ export class ViewManager {
   private client: OpenCodeClient;
   private contextManager: ContextManager;
   private getServerState: () => ServerState;
+  private registerSessionForView: (
+    viewId: string,
+    leaf: WorkspaceLeaf,
+    sessionId: string
+  ) => void;
 
   constructor(deps: ViewManagerDeps) {
     this.app = deps.app;
@@ -26,6 +36,7 @@ export class ViewManager {
     this.client = deps.client;
     this.contextManager = deps.contextManager;
     this.getServerState = deps.getServerState;
+    this.registerSessionForView = deps.registerSessionForView;
   }
 
   updateSettings(settings: OpenCodeSettings): void {
@@ -81,8 +92,12 @@ export class ViewManager {
     }
 
     const trackedUrl = view.getTrackedSessionUrl();
-    if (trackedUrl && this.client.resolveSessionId(trackedUrl)) {
+    const trackedSessionId = trackedUrl
+      ? this.client.resolveSessionId(trackedUrl)
+      : null;
+    if (trackedUrl && trackedSessionId) {
       view.setIframeUrl(trackedUrl);
+      this.registerSessionForView(view.getViewId(), view.getLeaf(), trackedSessionId);
       return;
     }
 
@@ -93,6 +108,7 @@ export class ViewManager {
 
     const sessionUrl = this.client.getSessionUrl(sessionId);
     view.setIframeUrl(sessionUrl);
+    this.registerSessionForView(view.getViewId(), view.getLeaf(), sessionId);
 
     if (this.app.workspace.activeLeaf === view.getLeaf()) {
       await this.contextManager.refreshContextForView(view);
