@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
-import { OPENCODE_VIEW_TYPE } from "../types";
+import { OPENCODE_PLUGIN_ID, OPENCODE_VIEW_TYPE } from "../types";
 import { OPENCODE_ICON_NAME } from "../icons";
 import type OpenCodePlugin from "../main";
 import type { ServerState } from "../server/types";
@@ -258,7 +258,7 @@ export class OpenCodeView extends ItemView {
     });
     settingsButton.addEventListener("click", () => {
       (this.app as any).setting.open();
-      (this.app as any).setting.openTabById("obsidian-opencode");
+      (this.app as any).setting.openTabById(OPENCODE_PLUGIN_ID);
     });
   }
 

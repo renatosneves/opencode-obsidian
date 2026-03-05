@@ -39,9 +39,9 @@ BRAT will automatically check for updates and notify you when new versions are a
 
 If you want to contribute or develop the plugin:
 
-1. Clone to `.obsidian/plugins/obsidian-opencode` subdirectory under your vault's root:
+1. Clone to `.obsidian/plugins/opencode-obsidian-neves` subdirectory under your vault's root:
    ```bash
-   git clone https://github.com/mtymek/opencode-obsidian.git .obsidian/plugins/obsidian-opencode
+   git clone https://github.com/mtymek/opencode-obsidian.git .obsidian/plugins/opencode-obsidian-neves
    ```
 2. Install dependencies and build:
    ```bash
@@ -55,6 +55,8 @@ If you want to contribute or develop the plugin:
 - Click the terminal icon in the ribbon, or
 - `Cmd/Ctrl+Shift+O` to toggle the panel
 - Server starts automatically when you open the panel
+- If you edit `AGENTS.md` or `CLAUDE.md`, restart the OpenCode server to reload rules (`Restart OpenCode server (reload AGENTS.md/CLAUDE.md)` command)
+- Use `Diagnose AGENTS.md/CLAUDE.md rule files` command to list detected rule files in the developer console
 
 
 ## Settings
@@ -96,4 +98,3 @@ If you see "Executable not found at 'opencode'" despite opencode being installed
    ```
 
 This is due to Electron/Obsidian not fully inheriting PATH on Windows.
-

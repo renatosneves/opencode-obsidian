@@ -30,4 +30,5 @@ export const DEFAULT_SETTINGS: OpenCodeSettings = {
   useCustomCommand: false,
 };
 
-export const OPENCODE_VIEW_TYPE = "opencode-view";
+export const OPENCODE_PLUGIN_ID = "opencode-obsidian-neves";
+export const OPENCODE_VIEW_TYPE = "opencode-view-neves";
