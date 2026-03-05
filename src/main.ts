@@ -90,6 +90,7 @@ export default class OpenCodePlugin extends Plugin {
     this.addRibbonIcon(OPENCODE_ICON_NAME, "OpenCode", () => {
       void this.viewManager.activateView();
     });
+    this.addRightRibbonIcon();
 
     this.addCommand({
       id: "toggle-opencode-view",
@@ -362,5 +363,30 @@ export default class OpenCodePlugin extends Plugin {
         this.stopServer();
       })
     );
+  }
+
+  private addRightRibbonIcon(): void {
+    const rightRibbon = (this.app.workspace as any).rightRibbon;
+    const addAction = rightRibbon?.addAction as
+      | ((icon: string, title: string, callback: (evt: MouseEvent) => any) => HTMLElement)
+      | undefined;
+
+    if (!addAction) {
+      console.warn("[OpenCode] Right ribbon is not available in this Obsidian build");
+      return;
+    }
+
+    const iconEl = addAction.call(
+      rightRibbon,
+      OPENCODE_ICON_NAME,
+      "OpenCode",
+      () => {
+        void this.viewManager.activateView();
+      }
+    );
+
+    this.register(() => {
+      iconEl.remove();
+    });
   }
 }
