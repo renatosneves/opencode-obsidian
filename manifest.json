@@ -1,7 +1,7 @@
 {
   "id": "opencode-obsidian-neves",
   "name": "OpenCode-Obsidian-Neves",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "minAppVersion": "1.4.0",
   "description": "Embed OpenCode AI assistant in Obsidian for AI-powered note management",
   "author": "mtymek",

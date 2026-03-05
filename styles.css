@@ -102,22 +102,9 @@
 
 /* iframe container */
 .opencode-iframe-container {
-  --opencode-iframe-left-rail-width: 72px;
   flex: 1;
   overflow: hidden;
   position: relative;
-}
-
-.opencode-iframe-container::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: var(--opencode-iframe-left-rail-width);
-  background: var(--background-primary);
-  pointer-events: none;
-  z-index: 2;
 }
 
 .opencode-iframe {

@@ -156,7 +156,7 @@ export class OpenCodeView extends ItemView {
     });
     setIcon(settingsButton, "settings");
     settingsButton.addEventListener("click", () => {
-      this.openUtilityRoute("settings");
+      this.openPluginSettings();
     });
 
     const helpButton = actionsEl.createEl("button", {
@@ -164,7 +164,7 @@ export class OpenCodeView extends ItemView {
     });
     setIcon(helpButton, "help-circle");
     helpButton.addEventListener("click", () => {
-      this.openUtilityRoute("help");
+      window.open("https://opencode.ai", "_blank");
     });
 
     const reloadButton = actionsEl.createEl("button", {
@@ -335,8 +335,7 @@ export class OpenCodeView extends ItemView {
       text: "Open Settings",
     });
     settingsButton.addEventListener("click", () => {
-      (this.app as any).setting.open();
-      (this.app as any).setting.openTabById(OPENCODE_PLUGIN_ID);
+      this.openPluginSettings();
     });
   }
 
@@ -352,11 +351,8 @@ export class OpenCodeView extends ItemView {
     }
   }
 
-  private openUtilityRoute(route: string): void {
-    if (!this.iframeEl) {
-      return;
-    }
-
-    this.iframeEl.src = `${this.plugin.getServerUrl()}/${route}`;
+  private openPluginSettings(): void {
+    (this.app as any).setting.open();
+    (this.app as any).setting.openTabById(OPENCODE_PLUGIN_ID);
   }
 }
