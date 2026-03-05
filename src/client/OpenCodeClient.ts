@@ -16,6 +16,11 @@ type OpenCodePart = {
 type OpenCodeMessageInfo = {
   id: string;
   sessionID: string;
+  role?: string;
+  time?: {
+    created?: number;
+    completed?: number;
+  };
 };
 
 type OpenCodeMessageWithParts = {
@@ -75,6 +80,29 @@ export class OpenCodeClient {
     });
     const session = this.unwrap(result);
     return session?.id ?? null;
+  }
+
+  async isSessionRunning(sessionId: string): Promise<boolean | null> {
+    const result = await this.request<OpenCodeMessageWithParts[]>(
+      "GET",
+      `/session/${sessionId}/message`
+    );
+    const messages = this.unwrap(result);
+    if (!messages) {
+      return null;
+    }
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message?.info?.role !== "assistant") {
+        continue;
+      }
+
+      const completed = message.info.time?.completed;
+      return !completed;
+    }
+
+    return false;
   }
 
   async updateContext(params: {

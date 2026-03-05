@@ -27,6 +27,8 @@ export default class OpenCodePlugin extends Plugin {
   private viewManager: ViewManager;
   private sessionRegistry = new SessionRegistry<WorkspaceLeaf>();
   private sessionTabsCallbacks: Array<() => void> = [];
+  private sessionActivityPollTimer: number | null = null;
+  private sessionActivityPollInFlight = false;
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
@@ -171,12 +173,14 @@ export default class OpenCodePlugin extends Plugin {
     });
 
     this.registerCleanupHandlers();
+    this.startSessionActivityPolling();
 
     console.log("OpenCode plugin loaded");
   }
 
   async onunload(): Promise<void> {
     this.contextManager.destroy();
+    this.stopSessionActivityPolling();
     await this.stopServer();
     this.app.workspace.detachLeavesOfType(OPENCODE_VIEW_TYPE);
     this.sessionTabsCallbacks = [];
@@ -367,6 +371,7 @@ export default class OpenCodePlugin extends Plugin {
     if (changed) {
       this.notifySessionTabsChange();
     }
+    void this.refreshSessionActivityStates();
   }
 
   unregisterLeafSessions(leaf: WorkspaceLeaf): void {
@@ -476,6 +481,72 @@ export default class OpenCodePlugin extends Plugin {
         this.stopServer();
       })
     );
+  }
+
+  private startSessionActivityPolling(): void {
+    if (this.sessionActivityPollTimer !== null) {
+      return;
+    }
+
+    this.sessionActivityPollTimer = window.setInterval(() => {
+      void this.refreshSessionActivityStates();
+    }, 2000);
+  }
+
+  private stopSessionActivityPolling(): void {
+    if (this.sessionActivityPollTimer === null) {
+      return;
+    }
+
+    window.clearInterval(this.sessionActivityPollTimer);
+    this.sessionActivityPollTimer = null;
+  }
+
+  private async refreshSessionActivityStates(): Promise<void> {
+    if (this.sessionActivityPollInFlight) {
+      return;
+    }
+
+    this.pruneStaleSessionLeaves();
+    const sessionIds = this.sessionRegistry.getSessionIds();
+    if (sessionIds.length === 0) {
+      return;
+    }
+
+    if (this.getServerState() !== "running") {
+      const changed = this.sessionRegistry.clearRunningStates();
+      if (changed) {
+        this.notifySessionTabsChange();
+      }
+      return;
+    }
+
+    this.sessionActivityPollInFlight = true;
+
+    try {
+      const statuses = await Promise.all(
+        sessionIds.map(async (sessionId) => ({
+          sessionId,
+          isRunning: await this.openCodeClient.isSessionRunning(sessionId),
+        }))
+      );
+
+      let changed = false;
+      for (const status of statuses) {
+        if (status.isRunning === null) {
+          continue;
+        }
+        if (this.sessionRegistry.setSessionRunning(status.sessionId, status.isRunning)) {
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        this.notifySessionTabsChange();
+      }
+    } finally {
+      this.sessionActivityPollInFlight = false;
+    }
   }
 
   private pruneStaleSessionLeaves(): void {

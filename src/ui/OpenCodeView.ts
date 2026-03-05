@@ -282,6 +282,9 @@ export class OpenCodeView extends ItemView {
       if (tab.isActive) {
         tabEl.addClass("is-active");
       }
+      if (tab.isRunning) {
+        tabEl.addClass("is-running");
+      }
       tabEl.addEventListener("click", () => {
         void this.plugin.activateSession(tab.sessionId);
       });

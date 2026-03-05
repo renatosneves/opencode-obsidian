@@ -16,11 +16,13 @@ describe("SessionRegistry", () => {
       sessionId: "session-1",
       label: "Session 1",
       isActive: false,
+      isRunning: false,
     });
     expect(tabs[1]).toEqual({
       sessionId: "session-2",
       label: "Session 2",
       isActive: false,
+      isRunning: false,
     });
   });
 
@@ -38,6 +40,7 @@ describe("SessionRegistry", () => {
         sessionId: "session-2",
         label: "Session 1",
         isActive: false,
+        isRunning: false,
       },
     ]);
   });
@@ -59,11 +62,13 @@ describe("SessionRegistry", () => {
         sessionId: "session-2",
         label: "Session 1",
         isActive: false,
+        isRunning: false,
       },
       {
         sessionId: "session-3",
         label: "Session 2",
         isActive: false,
+        isRunning: false,
       },
     ]);
   });
@@ -81,6 +86,32 @@ describe("SessionRegistry", () => {
         sessionId: "session-2",
         label: "Session 1",
         isActive: false,
+        isRunning: false,
+      },
+    ]);
+  });
+
+  test("running sessions are marked and can be reset", () => {
+    const registry = new SessionRegistry<FakeLeaf>();
+    registry.register("session-1", { id: "leaf-1" });
+
+    expect(registry.setSessionRunning("session-1", true)).toBe(true);
+    expect(registry.getTabs()).toEqual([
+      {
+        sessionId: "session-1",
+        label: "Session 1",
+        isActive: false,
+        isRunning: true,
+      },
+    ]);
+
+    expect(registry.clearRunningStates()).toBe(true);
+    expect(registry.getTabs()).toEqual([
+      {
+        sessionId: "session-1",
+        label: "Session 1",
+        isActive: false,
+        isRunning: false,
       },
     ]);
   });

@@ -3,6 +3,7 @@ import { OpenCodeSessionTab } from "../types";
 type SessionBinding<TLeaf> = {
   sessionId: string;
   leaf: TLeaf;
+  isRunning: boolean;
 };
 
 export class SessionRegistry<TLeaf> {
@@ -25,6 +26,7 @@ export class SessionRegistry<TLeaf> {
     const nextBinding: SessionBinding<TLeaf> = {
       sessionId,
       leaf,
+      isRunning: existing?.isRunning ?? false,
     };
 
     this.sessionBindings.set(sessionId, nextBinding);
@@ -87,6 +89,41 @@ export class SessionRegistry<TLeaf> {
     return this.sessionBindings.get(sessionId)?.leaf ?? null;
   }
 
+  setSessionRunning(sessionId: string, isRunning: boolean): boolean {
+    const binding = this.sessionBindings.get(sessionId);
+    if (!binding || binding.isRunning === isRunning) {
+      return false;
+    }
+
+    this.sessionBindings.set(sessionId, {
+      ...binding,
+      isRunning,
+    });
+    return true;
+  }
+
+  clearRunningStates(): boolean {
+    let changed = false;
+
+    for (const [sessionId, binding] of this.sessionBindings.entries()) {
+      if (!binding.isRunning) {
+        continue;
+      }
+      this.sessionBindings.set(sessionId, {
+        ...binding,
+        isRunning: false,
+      });
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  getSessionIds(): string[] {
+    this.normalizeSessionOrder();
+    return [...this.sessionOrder];
+  }
+
   getTabs(activeSessionId?: string): OpenCodeSessionTab[] {
     this.normalizeSessionOrder();
 
@@ -94,10 +131,16 @@ export class SessionRegistry<TLeaf> {
     const tabs: OpenCodeSessionTab[] = [];
 
     for (const sessionId of this.sessionOrder) {
+      const binding = this.sessionBindings.get(sessionId);
+      if (!binding) {
+        continue;
+      }
+
       tabs.push({
         sessionId,
         label: `Session ${labelNumber++}`,
         isActive: sessionId === activeSessionId,
+        isRunning: binding.isRunning,
       });
     }
 

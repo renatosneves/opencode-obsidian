@@ -119,8 +119,22 @@
   border-color: var(--interactive-accent);
 }
 
+.opencode-session-tab.is-running {
+  color: var(--background-primary);
+  background: var(--text-warning);
+  border-color: var(--text-warning);
+}
+
+.opencode-session-tab.is-running .opencode-session-tab-close {
+  color: var(--background-primary);
+}
+
 .opencode-session-tab.is-active .opencode-session-tab-close {
   color: var(--text-on-accent);
+}
+
+.opencode-session-tab.is-running.is-active .opencode-session-tab-close {
+  color: var(--background-primary);
 }
 
 .opencode-session-tab-add {

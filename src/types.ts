@@ -19,6 +19,7 @@ export interface OpenCodeSessionTab {
   sessionId: string;
   label: string;
   isActive: boolean;
+  isRunning: boolean;
 }
 
 export const DEFAULT_SETTINGS: OpenCodeSettings = {
