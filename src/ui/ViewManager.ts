@@ -41,12 +41,18 @@ export class ViewManager {
   }
 
   async activateView(): Promise<void> {
+    const existingLeaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
+
     // Create new leaf based on defaultViewLocation setting
     let leaf: WorkspaceLeaf | null = null;
-    if (this.settings.defaultViewLocation === "main") {
+    const useSidebar =
+      this.settings.defaultViewLocation === "sidebar" &&
+      existingLeaves.length === 0;
+
+    if (!useSidebar) {
       leaf = this.app.workspace.getLeaf("tab");
     } else {
-      leaf = this.app.workspace.getRightLeaf(true);
+      leaf = this.app.workspace.getRightLeaf(false);
     }
 
     if (leaf) {
@@ -74,8 +80,9 @@ export class ViewManager {
       return;
     }
 
-    const existingUrl = view.getIframeUrl();
-    if (existingUrl && this.client.resolveSessionId(existingUrl)) {
+    const trackedUrl = view.getTrackedSessionUrl();
+    if (trackedUrl && this.client.resolveSessionId(trackedUrl)) {
+      view.setIframeUrl(trackedUrl);
       return;
     }
 

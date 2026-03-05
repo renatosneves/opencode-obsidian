@@ -196,6 +196,10 @@ export class OpenCodeView extends ItemView {
     return this.iframeEl?.src ?? this.getCurrentSessionUrl();
   }
 
+  getTrackedSessionUrl(): string | null {
+    return this.getCurrentSessionUrl();
+  }
+
   getLeaf(): WorkspaceLeaf {
     return this.leaf;
   }
