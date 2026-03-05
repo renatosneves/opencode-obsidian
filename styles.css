@@ -108,8 +108,10 @@
 }
 
 .opencode-iframe {
-  width: 100%;
+  --opencode-iframe-left-rail-width: 72px;
+  width: calc(100% + var(--opencode-iframe-left-rail-width));
   height: 100%;
+  margin-left: calc(-1 * var(--opencode-iframe-left-rail-width));
   border: none;
   background-color: var(--background-primary);
 }

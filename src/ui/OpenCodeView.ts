@@ -151,6 +151,22 @@ export class OpenCodeView extends ItemView {
 
     const actionsEl = headerTopEl.createDiv({ cls: "opencode-header-actions" });
 
+    const settingsButton = actionsEl.createEl("button", {
+      attr: { "aria-label": "Open OpenCode settings" },
+    });
+    setIcon(settingsButton, "settings");
+    settingsButton.addEventListener("click", () => {
+      this.openUtilityRoute("settings");
+    });
+
+    const helpButton = actionsEl.createEl("button", {
+      attr: { "aria-label": "Open OpenCode help" },
+    });
+    setIcon(helpButton, "help-circle");
+    helpButton.addEventListener("click", () => {
+      this.openUtilityRoute("help");
+    });
+
     const reloadButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Reload" },
     });
@@ -334,5 +350,13 @@ export class OpenCodeView extends ItemView {
         }
       }, 100);
     }
+  }
+
+  private openUtilityRoute(route: string): void {
+    if (!this.iframeEl) {
+      return;
+    }
+
+    this.iframeEl.src = `${this.plugin.getServerUrl()}/${route}`;
   }
 }
