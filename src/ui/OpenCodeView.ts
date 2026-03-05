@@ -7,6 +7,7 @@ import type { ServerState } from "../server/types";
 export class OpenCodeView extends ItemView {
   plugin: OpenCodePlugin;
   private iframeEl: HTMLIFrameElement | null = null;
+  private sessionUrl: string | null = null;
   private currentState: ServerState = "stopped";
   private unsubscribeStateChange: (() => void) | null = null;
 
@@ -58,7 +59,7 @@ export class OpenCodeView extends ItemView {
     if (this.iframeEl) {
       const iframeUrl = this.iframeEl.src;
       if (iframeUrl.includes("/session/")) {
-        this.plugin.setCachedIframeUrl(iframeUrl);
+        this.sessionUrl = iframeUrl;
       }
       this.iframeEl.src = "about:blank";
       this.iframeEl = null;
@@ -144,6 +145,14 @@ export class OpenCodeView extends ItemView {
       this.reloadIframe();
     });
 
+    const restartButton = actionsEl.createEl("button", {
+      attr: { "aria-label": "Restart server (reload AGENTS.md/CLAUDE.md rules)" },
+    });
+    setIcon(restartButton, "rotate-ccw");
+    restartButton.addEventListener("click", () => {
+      void this.plugin.restartServer();
+    });
+
     const stopButton = actionsEl.createEl("button", {
       attr: { "aria-label": "Stop server" },
     });
@@ -156,7 +165,7 @@ export class OpenCodeView extends ItemView {
       cls: "opencode-iframe-container",
     });
 
-    const iframeUrl = this.plugin.getStoredIframeUrl() ?? this.plugin.getServerUrl();
+    const iframeUrl = this.getCurrentSessionUrl() ?? this.plugin.getServerUrl();
     console.log("[OpenCode] Loading iframe with URL:", iframeUrl);
 
     this.iframeEl = iframeContainer.createEl("iframe", {
@@ -184,13 +193,27 @@ export class OpenCodeView extends ItemView {
   }
 
   getIframeUrl(): string | null {
-    return this.iframeEl?.src ?? null;
+    return this.iframeEl?.src ?? this.getCurrentSessionUrl();
+  }
+
+  getLeaf(): WorkspaceLeaf {
+    return this.leaf;
   }
 
   setIframeUrl(url: string): void {
+    this.sessionUrl = url;
     if (this.iframeEl && this.iframeEl.src !== url) {
       this.iframeEl.src = url;
     }
+  }
+
+  private getCurrentSessionUrl(): string | null {
+    if (!this.sessionUrl) {
+      return null;
+    }
+
+    const expectedPrefix = `${this.plugin.getServerUrl()}/session/`;
+    return this.sessionUrl.startsWith(expectedPrefix) ? this.sessionUrl : null;
   }
 
   private renderErrorState(): void {

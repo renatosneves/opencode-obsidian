@@ -1,4 +1,7 @@
-import { Plugin, WorkspaceLeaf, Notice, EventRef, MarkdownView } from "obsidian";
+import { Plugin, Notice } from "obsidian";
+import { existsSync } from "fs";
+import { homedir } from "os";
+import { dirname, join, resolve } from "path";
 import { OpenCodeSettings, DEFAULT_SETTINGS, OPENCODE_VIEW_TYPE } from "./types";
 import { OpenCodeView } from "./ui/OpenCodeView";
 import { ViewManager } from "./ui/ViewManager";
@@ -16,8 +19,6 @@ export default class OpenCodePlugin extends Plugin {
   private openCodeClient: OpenCodeClient;
   private contextManager: ContextManager;
   private viewManager: ViewManager;
-  private cachedIframeUrl: string | null = null;
-  private lastBaseUrl: string | null = null;
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
@@ -52,17 +53,12 @@ export default class OpenCodePlugin extends Plugin {
       this.getServerUrl(),
       projectDirectory
     );
-    this.lastBaseUrl = this.getServerUrl();
 
     this.contextManager = new ContextManager({
       app: this.app,
       settings: this.settings,
       client: this.openCodeClient,
       getServerState: () => this.getServerState(),
-      getCachedIframeUrl: () => this.cachedIframeUrl,
-      setCachedIframeUrl: (url) => {
-        this.cachedIframeUrl = url;
-      },
       registerEvent: (ref) => this.registerEvent(ref),
     });
 
@@ -71,10 +67,6 @@ export default class OpenCodePlugin extends Plugin {
       settings: this.settings,
       client: this.openCodeClient,
       contextManager: this.contextManager,
-      getCachedIframeUrl: () => this.cachedIframeUrl,
-      setCachedIframeUrl: (url) => {
-        this.cachedIframeUrl = url;
-      },
       getServerState: () => this.getServerState(),
     });
 
@@ -126,6 +118,22 @@ export default class OpenCodePlugin extends Plugin {
       name: "Stop OpenCode server",
       callback: () => {
         this.stopServer();
+      },
+    });
+
+    this.addCommand({
+      id: "restart-opencode-server",
+      name: "Restart OpenCode server (reload AGENTS.md/CLAUDE.md)",
+      callback: () => {
+        void this.restartServer();
+      },
+    });
+
+    this.addCommand({
+      id: "diagnose-opencode-rules",
+      name: "Diagnose AGENTS.md/CLAUDE.md rule files",
+      callback: () => {
+        this.showRuleFileDiagnostics();
       },
     });
 
@@ -192,9 +200,12 @@ export default class OpenCodePlugin extends Plugin {
   }
 
   async startServer(): Promise<boolean> {
+    const previousState = this.getServerState();
     const success = await this.processManager.start();
     if (success) {
-      new Notice("OpenCode server started");
+      if (previousState !== "running" && previousState !== "starting") {
+        new Notice("OpenCode server started");
+      }
     } else {
       const error = this.processManager.getLastError();
       if (error) {
@@ -211,6 +222,78 @@ export default class OpenCodePlugin extends Plugin {
     new Notice("OpenCode server stopped");
   }
 
+  async restartServer(): Promise<boolean> {
+    const currentState = this.getServerState();
+    const wasRunning = currentState === "running" || currentState === "starting";
+
+    if (wasRunning) {
+      await this.processManager.stop();
+    }
+
+    const success = await this.processManager.start();
+    if (success) {
+      const action = wasRunning ? "restarted" : "started";
+      new Notice(`OpenCode server ${action}. AGENTS.md/CLAUDE.md rules reloaded.`);
+    } else {
+      const error = this.processManager.getLastError();
+      if (error) {
+        new Notice(`OpenCode failed to restart: ${error}`, 10000);
+      } else {
+        new Notice("OpenCode failed to restart. Check Settings for details.", 5000);
+      }
+    }
+
+    return success;
+  }
+
+  private showRuleFileDiagnostics(): void {
+    const projectDirectory = this.getProjectDirectory();
+    if (!projectDirectory) {
+      new Notice("Could not determine project directory. Check plugin settings.");
+      return;
+    }
+
+    const localMatches: string[] = [];
+    const seen = new Set<string>();
+    let currentDir = resolve(projectDirectory);
+
+    while (true) {
+      for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+        const candidate = join(currentDir, name);
+        if (existsSync(candidate) && !seen.has(candidate)) {
+          localMatches.push(candidate);
+          seen.add(candidate);
+        }
+      }
+
+      const parent = dirname(currentDir);
+      if (parent === currentDir) {
+        break;
+      }
+      currentDir = parent;
+    }
+
+    const globalCandidates = [
+      join(homedir(), ".config", "opencode", "AGENTS.md"),
+      join(homedir(), ".claude", "CLAUDE.md"),
+    ];
+    const globalMatches = globalCandidates.filter((path) => existsSync(path));
+
+    console.log("[OpenCode] Rule file diagnostics", {
+      projectDirectory,
+      localMatches,
+      globalMatches,
+    });
+
+    const totalMatches = localMatches.length + globalMatches.length;
+    if (totalMatches === 0) {
+      new Notice("No AGENTS.md/CLAUDE.md files found from project directory upward.");
+      return;
+    }
+
+    new Notice(`Found ${totalMatches} AGENTS.md/CLAUDE.md file(s). See developer console for details.`);
+  }
+
   getServerState(): ServerState {
     return this.processManager.getState() ?? "stopped";
   }
@@ -225,14 +308,6 @@ export default class OpenCodePlugin extends Plugin {
 
   getApiBaseUrl(): string {
     return `http://${this.settings.hostname}:${this.settings.port}`;
-  }
-
-  getStoredIframeUrl(): string | null {
-    return this.cachedIframeUrl;
-  }
-
-  setCachedIframeUrl(url: string | null): void {
-    this.cachedIframeUrl = url;
   }
 
   onServerStateChange(callback: (state: ServerState) => void): () => void {
@@ -256,12 +331,6 @@ export default class OpenCodePlugin extends Plugin {
     const nextApiBaseUrl = this.getApiBaseUrl();
     const projectDirectory = this.getProjectDirectory();
     this.openCodeClient.updateBaseUrl(nextApiBaseUrl, nextUiBaseUrl, projectDirectory);
-
-    if (this.lastBaseUrl && this.lastBaseUrl !== nextUiBaseUrl) {
-      this.cachedIframeUrl = null;
-    }
-
-    this.lastBaseUrl = nextUiBaseUrl;
   }
 
   refreshContextForView(view: OpenCodeView): void {

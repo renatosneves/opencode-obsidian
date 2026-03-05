@@ -10,8 +10,6 @@ type ContextManagerDeps = {
   settings: OpenCodeSettings;
   client: OpenCodeClient;
   getServerState: () => ServerState;
-  getCachedIframeUrl: () => string | null;
-  setCachedIframeUrl: (url: string | null) => void;
   registerEvent: (ref: EventRef) => void;
 };
 
@@ -21,8 +19,6 @@ export class ContextManager {
   private client: OpenCodeClient;
   private workspaceContext: WorkspaceContext;
   private getServerState: () => ServerState;
-  private getCachedIframeUrl: () => string | null;
-  private setCachedIframeUrl: (url: string | null) => void;
   private registerEvent: (ref: EventRef) => void;
 
   private contextEventRefs: EventRef[] = [];
@@ -34,8 +30,6 @@ export class ContextManager {
     this.client = deps.client;
     this.workspaceContext = new WorkspaceContext(this.app);
     this.getServerState = deps.getServerState;
-    this.getCachedIframeUrl = deps.getCachedIframeUrl;
-    this.setCachedIframeUrl = deps.setCachedIframeUrl;
     this.registerEvent = deps.registerEvent;
   }
 
@@ -146,8 +140,7 @@ export class ContextManager {
       return null;
     }
 
-    const leaf = leaves[0];
-    return leaf.getRoot() === rightSplit ? leaf : null;
+    return leaves.find((leaf) => leaf.getRoot() === rightSplit) ?? null;
   }
 
   async handleServerRunning(): Promise<void> {
@@ -162,12 +155,7 @@ export class ContextManager {
       return;
     }
 
-    const leaf = this.getLeafForRefresh();
-    if (!leaf) {
-      return;
-    }
-
-    await this.refreshContext(leaf);
+    await this.refreshContext(view.getLeaf());
   }
 
   private async refreshContext(leaf: WorkspaceLeaf): Promise<void> {
@@ -180,7 +168,7 @@ export class ContextManager {
     }
 
     const view = leaf.view instanceof OpenCodeView ? leaf.view : null;
-    const iframeUrl = this.getCachedIframeUrl() ?? view?.getIframeUrl();
+    const iframeUrl = view?.getIframeUrl();
     if (!iframeUrl) {
       return;
     }
@@ -189,8 +177,6 @@ export class ContextManager {
     if (!sessionId) {
       return;
     }
-
-    this.setCachedIframeUrl(iframeUrl);
 
     const { contextText } = this.workspaceContext.gatherContext(
       this.settings.maxNotesInContext,

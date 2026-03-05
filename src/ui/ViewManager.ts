@@ -10,8 +10,6 @@ type ViewManagerDeps = {
   settings: OpenCodeSettings;
   client: OpenCodeClient;
   contextManager: ContextManager;
-  getCachedIframeUrl: () => string | null;
-  setCachedIframeUrl: (url: string | null) => void;
   getServerState: () => ServerState;
 };
 
@@ -20,17 +18,13 @@ export class ViewManager {
   private settings: OpenCodeSettings;
   private client: OpenCodeClient;
   private contextManager: ContextManager;
-  private getCachedIframeUrl: () => string | null;
-  private setCachedIframeUrl: (url: string | null) => void;
-  private getServerState: () => string;
+  private getServerState: () => ServerState;
 
   constructor(deps: ViewManagerDeps) {
     this.app = deps.app;
     this.settings = deps.settings;
     this.client = deps.client;
     this.contextManager = deps.contextManager;
-    this.getCachedIframeUrl = deps.getCachedIframeUrl;
-    this.setCachedIframeUrl = deps.setCachedIframeUrl;
     this.getServerState = deps.getServerState;
   }
 
@@ -38,25 +32,21 @@ export class ViewManager {
     this.settings = settings;
   }
 
-  private getExistingLeaf(): WorkspaceLeaf | null {
-    const leaves = this.app.workspace.getLeavesOfType(OPENCODE_VIEW_TYPE);
-    return leaves.length > 0 ? leaves[0] : null;
+  private getActiveOpenCodeLeaf(): WorkspaceLeaf | null {
+    const activeLeaf = this.app.workspace.activeLeaf;
+    if (activeLeaf?.view.getViewType() === OPENCODE_VIEW_TYPE) {
+      return activeLeaf;
+    }
+    return null;
   }
 
   async activateView(): Promise<void> {
-    const existingLeaf = this.getExistingLeaf();
-
-    if (existingLeaf) {
-      this.app.workspace.revealLeaf(existingLeaf);
-      return;
-    }
-
     // Create new leaf based on defaultViewLocation setting
     let leaf: WorkspaceLeaf | null = null;
     if (this.settings.defaultViewLocation === "main") {
       leaf = this.app.workspace.getLeaf("tab");
     } else {
-      leaf = this.app.workspace.getRightLeaf(false);
+      leaf = this.app.workspace.getRightLeaf(true);
     }
 
     if (leaf) {
@@ -69,27 +59,14 @@ export class ViewManager {
   }
 
   async toggleView(): Promise<void> {
-    const existingLeaf = this.getExistingLeaf();
+    const activeLeaf = this.getActiveOpenCodeLeaf();
 
-    if (existingLeaf) {
-      // Check if the view is in the sidebar or main area
-      const isInSidebar = existingLeaf.getRoot() === this.app.workspace.rightSplit;
-
-      if (isInSidebar) {
-        // For sidebar views, check if sidebar is collapsed
-        const rightSplit = this.app.workspace.rightSplit;
-        if (rightSplit && !rightSplit.collapsed) {
-          existingLeaf.detach();
-        } else {
-          this.app.workspace.revealLeaf(existingLeaf);
-        }
-      } else {
-        // For main area views, just detach (close the tab)
-        existingLeaf.detach();
-      }
-    } else {
-      await this.activateView();
+    if (activeLeaf) {
+      activeLeaf.detach();
+      return;
     }
+
+    await this.activateView();
   }
 
   async ensureSessionUrl(view: OpenCodeView): Promise<void> {
@@ -97,10 +74,8 @@ export class ViewManager {
       return;
     }
 
-    const cachedUrl = this.getCachedIframeUrl();
-    const existingUrl = cachedUrl ?? view.getIframeUrl();
+    const existingUrl = view.getIframeUrl();
     if (existingUrl && this.client.resolveSessionId(existingUrl)) {
-      this.setCachedIframeUrl(existingUrl);
       return;
     }
 
@@ -110,10 +85,9 @@ export class ViewManager {
     }
 
     const sessionUrl = this.client.getSessionUrl(sessionId);
-    this.setCachedIframeUrl(sessionUrl);
     view.setIframeUrl(sessionUrl);
 
-    if (this.app.workspace.activeLeaf === view.leaf) {
+    if (this.app.workspace.activeLeaf === view.getLeaf()) {
       await this.contextManager.refreshContextForView(view);
     }
   }

@@ -33,8 +33,7 @@ export class OpenCodeClient {
   private apiBaseUrl: string;
   private uiBaseUrl: string;
   private projectDirectory: string;
-  private trackedSessionId: string | null = null;
-  private lastPart: OpenCodePart | null = null;
+  private sessionParts = new Map<string, OpenCodePart | null>();
 
   constructor(apiBaseUrl: string, uiBaseUrl: string, projectDirectory: string) {
     this.apiBaseUrl = this.normalizeBaseUrl(apiBaseUrl);
@@ -58,8 +57,7 @@ export class OpenCodeClient {
   }
 
   resetTracking(): void {
-    this.trackedSessionId = null;
-    this.lastPart = null;
+    this.sessionParts.clear();
   }
 
   getSessionUrl(sessionId: string): string {
@@ -85,28 +83,23 @@ export class OpenCodeClient {
   }): Promise<void> {
     const { sessionId, contextText } = params;
 
-    if (this.trackedSessionId && this.trackedSessionId !== sessionId) {
-      this.resetTracking();
-    }
-    this.trackedSessionId = sessionId;
-
     if (!contextText) {
-      await this.ignorePreviousPart();
+      await this.ignorePreviousPart(sessionId);
       return;
     }
 
-    if (this.lastPart) {
-      const updated = await this.updatePart(this.lastPart, { text: contextText });
+    const lastPart = this.sessionParts.get(sessionId) ?? null;
+    if (lastPart) {
+      const updated = await this.updatePart(lastPart, { text: contextText });
       if (updated) {
+        this.sessionParts.set(sessionId, updated);
         return;
       }
-      await this.ignorePreviousPart();
+      await this.ignorePreviousPart(sessionId);
     }
 
     const message = await this.sendPrompt(sessionId, contextText);
-    if (message?.info?.id) {
-      this.lastPart = message.parts?.[0] ?? null;
-    }
+    this.sessionParts.set(sessionId, message?.parts?.[0] ?? null);
   }
 
   private async sendPrompt(sessionId: string, contextText: string): Promise<OpenCodeMessageWithParts | null> {
@@ -129,7 +122,10 @@ export class OpenCodeClient {
     return message;
   }
 
-  private async updatePart(part: OpenCodePart, updates: { text?: string; ignored?: boolean }): Promise<boolean> {
+  private async updatePart(
+    part: OpenCodePart,
+    updates: { text?: string; ignored?: boolean }
+  ): Promise<OpenCodePart | null> {
     const result = await this.request<OpenCodePart>(
       "PATCH",
       `/session/${part.sessionID}/message/${part.messageID}/part/${part.id}`,
@@ -138,25 +134,21 @@ export class OpenCodeClient {
         ...updates,
       }
     );
-    const updated = this.unwrap(result);
-    if (updated) {
-      this.lastPart = updated;
-      return true;
-    }
-    return false;
+    return this.unwrap(result);
   }
 
-  private async ignorePreviousPart(): Promise<boolean> {
-    if (!this.lastPart) {
+  private async ignorePreviousPart(sessionId: string): Promise<boolean> {
+    const part = this.sessionParts.get(sessionId) ?? null;
+    if (!part) {
       return false;
     }
 
-    const ignored = await this.updatePart(this.lastPart, { ignored: true });
+    const ignored = await this.updatePart(part, { ignored: true });
     if (!ignored) {
       return false;
     }
 
-    this.lastPart = null;
+    this.sessionParts.set(sessionId, null);
     return true;
   }
 
