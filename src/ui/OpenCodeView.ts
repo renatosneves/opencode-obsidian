@@ -64,7 +64,7 @@ export class OpenCodeView extends ItemView {
       this.unsubscribeSessionTabsChange = null;
     }
 
-    this.plugin.unregisterLeafSessions(this.leaf);
+    await this.plugin.closeSessionsForLeaf(this.leaf);
     
     // Clean up iframe
     if (this.iframeEl) {

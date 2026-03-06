@@ -82,6 +82,29 @@ export class OpenCodeClient {
     return session?.id ?? null;
   }
 
+  async abortSession(sessionId: string): Promise<boolean> {
+    const result = await this.request<boolean>("POST", `/session/${sessionId}/abort`);
+    return this.unwrap(result) === true;
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    const result = await this.request<boolean>("DELETE", `/session/${sessionId}`);
+    return this.unwrap(result) === true;
+  }
+
+  async closeSession(sessionId: string): Promise<boolean> {
+    const aborted = await this.abortSession(sessionId);
+    if (!aborted) {
+      console.warn("[OpenCode] Failed to abort session before delete", { sessionId });
+    }
+
+    const deleted = await this.deleteSession(sessionId);
+    if (deleted) {
+      this.sessionParts.delete(sessionId);
+    }
+    return deleted;
+  }
+
   async isSessionRunning(sessionId: string): Promise<boolean | null> {
     const result = await this.request<OpenCodeMessageWithParts[]>(
       "GET",

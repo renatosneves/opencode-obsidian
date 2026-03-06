@@ -124,6 +124,21 @@ export class SessionRegistry<TLeaf> {
     return [...this.sessionOrder];
   }
 
+  getSessionIdsForLeaf(leaf: TLeaf): string[] {
+    this.normalizeSessionOrder();
+
+    const sessionIds: string[] = [];
+    for (const sessionId of this.sessionOrder) {
+      const binding = this.sessionBindings.get(sessionId);
+      if (!binding || binding.leaf !== leaf) {
+        continue;
+      }
+      sessionIds.push(sessionId);
+    }
+
+    return sessionIds;
+  }
+
   getTabs(activeSessionId?: string): OpenCodeSessionTab[] {
     this.normalizeSessionOrder();
 

@@ -29,6 +29,7 @@ export default class OpenCodePlugin extends Plugin {
   private sessionTabsCallbacks: Array<() => void> = [];
   private sessionActivityPollTimer: number | null = null;
   private sessionActivityPollInFlight = false;
+  private closingSessionIds = new Set<string>();
 
   async onload(): Promise<void> {
     console.log("Loading OpenCode plugin");
@@ -381,6 +382,37 @@ export default class OpenCodePlugin extends Plugin {
     }
   }
 
+  async closeSessionsForLeaf(leaf: WorkspaceLeaf): Promise<void> {
+    const sessionIds = this.sessionRegistry.getSessionIdsForLeaf(leaf);
+    if (sessionIds.length === 0) {
+      this.unregisterLeafSessions(leaf);
+      return;
+    }
+
+    const failedSessionIds: string[] = [];
+
+    if (this.getServerState() === "running") {
+      for (const sessionId of sessionIds) {
+        if (this.closingSessionIds.has(sessionId)) {
+          continue;
+        }
+        const closed = await this.closeSessionOnServer(sessionId);
+        if (!closed) {
+          failedSessionIds.push(sessionId);
+        }
+      }
+    }
+
+    this.unregisterLeafSessions(leaf);
+
+    if (failedSessionIds.length > 0) {
+      const suffix = failedSessionIds.length === 1 ? "" : "s";
+      new Notice(
+        `Failed to close ${failedSessionIds.length} OpenCode session${suffix} on server.`
+      );
+    }
+  }
+
   getSessionTabs(activeSessionId?: string): OpenCodeSessionTab[] {
     this.pruneStaleSessionLeaves();
     return this.sessionRegistry.getTabs(activeSessionId);
@@ -413,9 +445,32 @@ export default class OpenCodePlugin extends Plugin {
   async closeSession(sessionId: string, currentSessionId?: string): Promise<void> {
     this.pruneStaleSessionLeaves();
 
+    if (this.closingSessionIds.has(sessionId)) {
+      return;
+    }
+
     const tabsBefore = this.sessionRegistry.getTabs(currentSessionId);
     const closedIndex = tabsBefore.findIndex((tab) => tab.sessionId === sessionId);
     if (closedIndex < 0) {
+      return;
+    }
+
+    const leaf = this.sessionRegistry.resolveLeaf(sessionId);
+    const shouldDetachLeaf =
+      !!leaf &&
+      this.settings.defaultViewLocation !== "sidebar" &&
+      this.sessionRegistry.getSessionIdsForLeaf(leaf).length === 1;
+
+    this.closingSessionIds.add(sessionId);
+    let closedOnServer = false;
+    try {
+      closedOnServer = await this.closeSessionOnServer(sessionId);
+    } finally {
+      this.closingSessionIds.delete(sessionId);
+    }
+
+    if (!closedOnServer) {
+      new Notice("Failed to close OpenCode session. Please retry.");
       return;
     }
 
@@ -431,12 +486,18 @@ export default class OpenCodePlugin extends Plugin {
 
     if (tabsAfter.length === 0) {
       this.notifySessionTabsChange();
+      if (shouldDetachLeaf && leaf) {
+        leaf.detach();
+      }
       await this.openNewSessionView();
       return;
     }
 
     if (!wasCurrentSession) {
       this.notifySessionTabsChange();
+      if (shouldDetachLeaf && leaf) {
+        leaf.detach();
+      }
       return;
     }
 
@@ -444,10 +505,16 @@ export default class OpenCodePlugin extends Plugin {
     const fallbackSession = tabsAfter[nextIndex];
     if (!fallbackSession) {
       this.notifySessionTabsChange();
+      if (shouldDetachLeaf && leaf) {
+        leaf.detach();
+      }
       return;
     }
 
     await this.activateSession(fallbackSession.sessionId);
+    if (shouldDetachLeaf && leaf) {
+      leaf.detach();
+    }
   }
 
   onSessionTabsChange(callback: () => void): () => void {
@@ -555,6 +622,10 @@ export default class OpenCodePlugin extends Plugin {
     if (changed) {
       this.notifySessionTabsChange();
     }
+  }
+
+  private async closeSessionOnServer(sessionId: string): Promise<boolean> {
+    return await this.openCodeClient.closeSession(sessionId);
   }
 
   private notifySessionTabsChange(): void {

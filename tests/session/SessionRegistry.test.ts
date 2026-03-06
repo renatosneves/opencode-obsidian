@@ -136,4 +136,30 @@ describe("SessionRegistry", () => {
     expect(registry.resolveLeaf("missing-session")).toBeNull();
     expect(registry.getTabs()).toEqual(before);
   });
+
+  test("returns session ids bound to a specific leaf in tab order", () => {
+    const registry = new SessionRegistry<FakeLeaf>();
+    const leaf1 = { id: "leaf-1" };
+    const leaf2 = { id: "leaf-2" };
+
+    registry.register("session-1", leaf1);
+    registry.register("session-2", leaf2);
+    registry.register("session-3", leaf1);
+
+    expect(registry.getSessionIdsForLeaf(leaf1)).toEqual([
+      "session-1",
+      "session-3",
+    ]);
+    expect(registry.getSessionIdsForLeaf(leaf2)).toEqual(["session-2"]);
+  });
+
+  test("returns empty array for leaf with no sessions", () => {
+    const registry = new SessionRegistry<FakeLeaf>();
+    const existingLeaf = { id: "leaf-1" };
+    const missingLeaf = { id: "leaf-missing" };
+
+    registry.register("session-1", existingLeaf);
+
+    expect(registry.getSessionIdsForLeaf(missingLeaf)).toEqual([]);
+  });
 });
